@@ -1,38 +1,108 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Простое приложение (обучение) для записи и получения данных.
+## Используемые технологии: TypeScript, React, Next, Prisma, MySQL, Tailwind.css
 
-## Getting Started
+### Предустановка
 
-First, run the development server:
+1. Инициализируем next.js app:
+```
+npx create-next-app@latest
+```
+2. Запускаем MySQL на сервере (phpMyAdmin)
+3. Устанавливаем prisma
+```
+npm install prisma -D
+```
+4. Инициализируем prisma. После этого будет создан файл **schema.prisma**, который содержит в себе schema с БД и модели + **.env** файл, в котором будет указан адресс для соединения с БД
+```
+npx prisma init
+```
+5. В файле prisma/schema.prisma уже будет прописан генератор и источник бд:
+![image](https://user-images.githubusercontent.com/66534080/234684015-48a7fc27-d0f6-400c-914d-561262f6e9de.png)
+В provider не забудьте указать наименование своей БД. Я использовал mysql.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
+6. Следующий шаг: в файле .env укажем БД URL, с помощью которого будет подключаться к БД:
+![image](https://user-images.githubusercontent.com/66534080/234684301-4ac6576b-27d4-4e4c-9af5-e65849971876.png)
+```
+mysql://USER:PASSWORD@HOST:PORT/DATABASE
+```
+7. Создаем таблицу БД, прописав в prsima/schema.prisma model (в моем случае таблица будет называться "user"):
+![image](https://user-images.githubusercontent.com/66534080/234684583-920eea09-01a0-48ba-a7d8-543b772022a3.png)
+
+8. Чтобы prisma создала БД по модели используем ```prisma migrate CLI commands```:
+```
+npx prisma migrate dev --name init
+```
+Создаст migration file с обычными query для создания таблицы в БД.
+
+9. Устанавливаем prisma client:
+```
+npm install @prisma/client
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Серверная часть
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+10. Next.js - это fullstack web framework, который в своей основе использует express. Создаем файл ```src/pages/api/users.ts``` в котором будем указывать роутинг и функцию обработки для этого роутинга:
+![image](https://user-images.githubusercontent.com/66534080/234685660-9b38b7f7-13fe-4466-82bd-c405882a98f3.png)
+Импортируем типы next js request и response.
+Импортируем PrismaClient конструктор, с помощью которого через prisma будем взаимодействовать с нашей БД.
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+11. Создаем асинхронную функцию с request и response в качестве аргумента.
+В Next.js наименование файла (в /pages) это уже роуты, т.е. в нашем случае мы создали роут ```http://localhost:3001/```**users** по которому будем отправлять GET и POST запросы.
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+12. Создаем if...else условие. Если мы используем метод **POST**, то:
+![image](https://user-images.githubusercontent.com/66534080/234686478-75ed112d-f213-4cec-88c8-a36bbd41c54e.png)
+Вытаскиваем из req.body (тело нашего запроса с клиента - request body) передаваемые свойства (в нашем случае **login** и **password**).
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+Используем trycatch для обработки ошибок. В блоке **try** обращаемся к prisma:
+```prisma.user.create({...})```
+Где **user** наименование нашей таблицы (БД), а **create** - метод для записи данных в таблицу.
 
-## Learn More
+Аргументом метода create будут наши передаваемые данные:
+```
+data: {
+  login,
+  password
+}
+```
+Т.к. наименование полей в таблице БД такие же, как и наименование свойств, передаваемых с клиента (получаемых из body), то пишем так сокращенно, а не:
+```
+data: {
+  login: переменная_с_данными,
+  password: переменная_с_данными
+}
+```
 
-To learn more about Next.js, take a look at the following resources:
+После отправки данных создаем ответ со статусом 200 (ОК) и сообщением "New user".
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+13. В блоке else подразумеваю, что используется GET запрос. Здесь с помощью метода **findMany()** без указания фильтрации и пр. вытаскиваю все данные из таблицы user, а далее передаю ответ с массивом этих данных:
+![image](https://user-images.githubusercontent.com/66534080/234688047-6bfd2c02-c516-48fc-86db-026c0e770503.png)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+### Клиентская часть
 
-## Deploy on Vercel
+14. Подробнее см. ```src/pages/index.tsx```, но, если коротко, то для сбора данных из формы я использовал **react-hook-form ts** (можно было бы через управляемые input's через useState, но захотелось добавить что-нибудь).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Сначала сделал фронт для получения всех данных.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+#### getData
+![image](https://user-images.githubusercontent.com/66534080/234688946-cc11d8fa-4ea4-4019-a22f-d5f5b2f5abde.png)
+Использую обычный fetch (хотя можно было бы добавить сюда еще axios для простоты и меньшего количества кода), отправляя **GET-запрос** по адресу ```api/users```, где, напомню, я с помощью **prisma** просто получаю весь массив данных с таблицы БД. Далее преобразю данные из json в массив и с помощью **useState** закидываю их все в стейт (+ в консоль вывожу для отладки).
+
+В компоненте просто проверяю наличие данных в стейте и, если они есть, то вывожу их иначе ставлю заглушку в виде текста "There is no data".
+На кнопку вешаю обработчик событий onClick с методом **getData**. По нажатию получаю весь список данных.
+
+#### onSubmit
+
+Собираю все данные с формы с помощью react-hook-form (ts), проверяю наличие у собранного объекта свойств **login** и **password**, если все есть, то отправляю **POST-запрос**:
+![image](https://user-images.githubusercontent.com/66534080/234690269-b0d44ad5-351d-42c9-b97b-3e0f7eaca239.png)
+Запрос отдаю по тому же роуту ```api/users``` в **body** закидываю полученные данные (это объект с двумя свойствами) по типу:
+```
+{ login: "Мой логин", password: "qwerty123" }
+```
+Устанавливаю заголовки, указывая, что отправляю json.
+Указываю метод **POST**.
+
+Для отладки еще вывожу, полученный с помощью react-hook-form (ts), полученный объект с данными.
+
+Далее, напомню, в файле **src/pages/api/users.ts** обрабатываю полученные данные методом POST (с помощью prisma создаю новую запись в таблицу БД).
+
+15. Все готово! ✌️
